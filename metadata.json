@@ -1,0 +1,5 @@
+{
+  "name": "IsoWeather 3D",
+  "description": "A stunning 3D isometric weather visualizer inspired by digital art. Features real-time weather data visualization using particle systems to represent rain, snow, and clear skies on an interactive 3D platform.",
+  "requestFramePermissions": []
+}
