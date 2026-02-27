@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WeatherData, WeatherCondition, CityOption } from '../../types';
 import { CITIES } from '../../constants';
 import { searchCities } from '../../services/weatherService';
-import { Cloud, CloudRain, Sun, Snowflake, CloudLightning, Wind, MapPin, Droplets, Moon, Cpu, Thermometer, Radio, Clock, Send, Search, X, Loader2, CheckCircle2, Aperture, Square, Download, Trash2, Film, Gift } from 'lucide-react';
+import { Cloud, CloudRain, Sun, Snowflake, CloudLightning, Wind, MapPin, Droplets, Moon, Cpu, Thermometer, Radio, Clock, Send, Search, X, Loader2, CheckCircle2, Aperture, Square, Download, Trash2, Film, Gift, Mic, Volume2, VolumeX, Smartphone, QrCode } from 'lucide-react';
+import QRCode from 'qrcode';
 
 interface InterfaceProps {
   weather: WeatherData | null;
@@ -15,6 +16,11 @@ interface InterfaceProps {
   onSimConditionChange: (c: WeatherCondition) => void;
   simTemperature: number;
   onSimTemperatureChange: (t: number) => void;
+  isAudioEnabled: boolean;
+  onToggleAudio: () => void;
+  isMicEnabled: boolean;
+  onToggleMic: () => void;
+  peerId: string | null; // New Prop
 }
 
 // Reusable Glass Panel Component
@@ -51,7 +57,40 @@ const Tooltip = ({ children, content }: TooltipProps) => {
   );
 };
 
-// --- GIFT RECORDER MODAL ---
+// --- QR CODE MODAL ---
+const ConnectModal = ({ peerId, onClose }: { peerId: string, onClose: () => void }) => {
+  const [qrSrc, setQrSrc] = useState('');
+
+  useEffect(() => {
+    // Generate URL for the mobile controller mode
+    const url = `${window.location.protocol}//${window.location.host}${window.location.pathname}?mode=controller&host=${peerId}`;
+    QRCode.toDataURL(url, { margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+      .then(setQrSrc)
+      .catch(console.error);
+  }, [peerId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-neutral-900 border border-white/10 rounded-3xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center">
+         <div className="w-12 h-12 bg-cyan-500/20 rounded-full flex items-center justify-center text-cyan-400 mb-4">
+            <Smartphone size={24} />
+         </div>
+         <h2 className="text-xl text-white font-light tracking-widest uppercase mb-2">Connect Device</h2>
+         <p className="text-white/50 text-xs mb-6 px-4">Scan to use your phone as a motion controller and wind sensor.</p>
+         
+         <div className="bg-white p-2 rounded-xl mb-6 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+            {qrSrc ? <img src={qrSrc} alt="Scan QR" className="w-48 h-48" /> : <Loader2 className="w-48 h-48 text-black animate-spin p-20"/>}
+         </div>
+
+         <button onClick={onClose} className="text-white/40 hover:text-white transition-colors text-sm uppercase tracking-wider font-bold">
+            Close
+         </button>
+      </div>
+    </div>
+  );
+};
+
+// ... [Existing GiftModal and SmartMessenger components remain unchanged] ...
 const GiftModal = ({ videoUrl, onClose, onDownload, cityName, condition }: { videoUrl: string, onClose: () => void, onDownload: () => void, cityName: string, condition: string }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
@@ -101,7 +140,6 @@ const GiftModal = ({ videoUrl, onClose, onDownload, cityName, condition }: { vid
   );
 };
 
-// --- SMART MESSENGER COMPONENT ---
 const SmartMessenger = ({ weather }: { weather: WeatherData }) => {
   const [message, setMessage] = useState('');
   const [localTimeStr, setLocalTimeStr] = useState('');
@@ -213,13 +251,21 @@ export const Interface: React.FC<InterfaceProps> = ({
   simCondition,
   onSimConditionChange,
   simTemperature,
-  onSimTemperatureChange
+  onSimTemperatureChange,
+  isAudioEnabled,
+  onToggleAudio,
+  isMicEnabled,
+  onToggleMic,
+  peerId
 }) => {
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CityOption[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>(null);
+  
+  // UI State
+  const [showConnectModal, setShowConnectModal] = useState(false);
 
   // Recorder State
   const [isRecording, setIsRecording] = useState(false);
@@ -319,7 +365,7 @@ export const Interface: React.FC<InterfaceProps> = ({
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col md:flex-row p-6 md:p-12 gap-6 z-10 overflow-hidden font-sans">
         
-        {/* Modal Overlay */}
+        {/* Modal Overlays */}
         {videoUrl && (
             <div className="pointer-events-auto">
                 <GiftModal 
@@ -329,6 +375,12 @@ export const Interface: React.FC<InterfaceProps> = ({
                     cityName={selectedCity}
                     condition={isSimMode ? simCondition : weather?.description || 'Weather'}
                 />
+            </div>
+        )}
+
+        {showConnectModal && peerId && (
+            <div className="pointer-events-auto">
+                <ConnectModal peerId={peerId} onClose={() => setShowConnectModal(false)} />
             </div>
         )}
 
@@ -350,15 +402,47 @@ export const Interface: React.FC<InterfaceProps> = ({
                             </div>
                         </div>
                         
-                        {/* Sim Toggle Small */}
-                         <Tooltip content={isSimMode ? "Disable Simulation" : "Enable Simulation Mode"}>
-                            <button 
-                                onClick={onToggleSim}
-                                className={`p-3 rounded-full transition-all duration-300 border ${isSimMode ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
-                            >
-                                <Cpu size={18} strokeWidth={isSimMode ? 2.5 : 1.5} />
-                            </button>
-                         </Tooltip>
+                        <div className="flex gap-2">
+                             {/* Phone Connect */}
+                             <Tooltip content="Connect Phone Controller">
+                                <button 
+                                    onClick={() => setShowConnectModal(true)}
+                                    className="p-3 rounded-full bg-white/5 border border-white/10 text-white/30 hover:bg-white/10 hover:text-white transition-all duration-300"
+                                >
+                                    <Smartphone size={18} strokeWidth={1.5} />
+                                </button>
+                             </Tooltip>
+
+                             {/* Mic Toggle */}
+                             <Tooltip content={isMicEnabled ? "Disable Breath Interaction" : "Enable Microphone (Blow to create wind)"}>
+                                <button 
+                                    onClick={onToggleMic}
+                                    className={`p-3 rounded-full transition-all duration-300 border ${isMicEnabled ? 'bg-red-500/10 border-red-500/50 text-red-400 shadow-[0_0_20px_rgba(248,113,113,0.3)]' : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
+                                >
+                                    <Mic size={18} strokeWidth={isMicEnabled ? 2.5 : 1.5} className={isMicEnabled ? "animate-pulse" : ""}/>
+                                </button>
+                             </Tooltip>
+                             
+                             {/* Audio Toggle */}
+                             <Tooltip content={isAudioEnabled ? "Mute Audio" : "Enable Procedural Audio"}>
+                                <button 
+                                    onClick={onToggleAudio}
+                                    className={`p-3 rounded-full transition-all duration-300 border ${isAudioEnabled ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-400' : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
+                                >
+                                    {isAudioEnabled ? <Volume2 size={18} strokeWidth={2}/> : <VolumeX size={18} strokeWidth={1.5}/>}
+                                </button>
+                             </Tooltip>
+
+                             {/* Sim Toggle Small */}
+                             <Tooltip content={isSimMode ? "Disable Simulation" : "Enable Simulation Mode"}>
+                                <button 
+                                    onClick={onToggleSim}
+                                    className={`p-3 rounded-full transition-all duration-300 border ${isSimMode ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10 hover:text-white'}`}
+                                >
+                                    <Cpu size={18} strokeWidth={isSimMode ? 2.5 : 1.5} />
+                                </button>
+                             </Tooltip>
+                        </div>
                     </div>
 
                     {/* Main Content */}

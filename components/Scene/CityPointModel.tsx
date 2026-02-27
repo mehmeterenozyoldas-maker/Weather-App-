@@ -81,35 +81,35 @@ const DEFAULT_STYLE = {
 // Procedural Textures
 const generateTextures = () => {
   const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 128;
+  canvas.width = 128;
+  canvas.height = 256;
   const ctx = canvas.getContext('2d');
   
   if (ctx) {
     ctx.fillStyle = '#888'; // Lighter concrete for snow vibe
-    ctx.fillRect(0, 0, 64, 128);
+    ctx.fillRect(0, 0, 128, 256);
     ctx.fillStyle = '#ddd'; 
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 4; x++) {
-        if (Math.random() > 0.1) ctx.fillRect(4 + x * 15, 2 + y * 8, 8, 5);
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 8; x++) {
+        if (Math.random() > 0.1) ctx.fillRect(8 + x * 15, 4 + y * 8, 8, 5);
       }
     }
   }
   const buildingTex = new THREE.CanvasTexture(canvas);
-  buildingTex.magFilter = THREE.NearestFilter;
+  buildingTex.magFilter = THREE.LinearFilter;
 
   if (ctx) {
     ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, 64, 128);
+    ctx.fillRect(0, 0, 128, 256);
     ctx.fillStyle = '#fff';
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 4; x++) {
-        if (Math.random() > 0.6) ctx.fillRect(4 + x * 15, 2 + y * 8, 8, 5);
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 8; x++) {
+        if (Math.random() > 0.6) ctx.fillRect(8 + x * 15, 4 + y * 8, 8, 5);
       }
     }
   }
   const emissiveTex = new THREE.CanvasTexture(canvas);
-  emissiveTex.magFilter = THREE.NearestFilter;
+  emissiveTex.magFilter = THREE.LinearFilter;
 
   return { buildingTex, emissiveTex };
 };
@@ -117,15 +117,17 @@ const generateTextures = () => {
 export const CityPointModel: React.FC<CityPointModelProps> = ({ cityName, isDay }) => {
   const buildingRef = useRef<THREE.InstancedMesh>(null);
   const terrainRef = useRef<THREE.InstancedMesh>(null);
+  const waterRef = useRef<THREE.InstancedMesh>(null);
   const propsRef = useRef<THREE.InstancedMesh>(null);
   const presenceRef = useRef<THREE.InstancedMesh>(null); // New ref for user presence lights
   
   const { buildingTex, emissiveTex } = useMemo(() => generateTextures(), []);
 
-  const { buildings, terrain, props, presenceLights } = useMemo(() => {
+  const { buildings, terrain, water, props, presenceLights } = useMemo(() => {
     const style = CITY_STYLES[cityName] || DEFAULT_STYLE;
     const tempBuildings = [];
     const tempTerrain = [];
+    const tempWater = [];
     const tempProps = [];
     const tempPresence = [];
     const dummy = new THREE.Object3D();
@@ -163,7 +165,7 @@ export const CityPointModel: React.FC<CityPointModelProps> = ({ cityName, isDay 
           dummy.position.set(posX, 0.0, posZ);
           dummy.scale.set(blockSize, 0.1, blockSize);
           dummy.updateMatrix();
-          tempTerrain.push({ matrix: dummy.matrix.clone(), color: new THREE.Color('#bfdbfe') });
+          tempWater.push({ matrix: dummy.matrix.clone(), color: new THREE.Color('#3b82f6') });
 
           if (style.hasBoats && rand() > 0.95) {
              dummy.position.set(posX, 0.1, posZ);
@@ -249,7 +251,7 @@ export const CityPointModel: React.FC<CityPointModelProps> = ({ cityName, isDay 
         }
       }
     }
-    return { buildings: tempBuildings, terrain: tempTerrain, props: tempProps, presenceLights: tempPresence };
+    return { buildings: tempBuildings, terrain: tempTerrain, water: tempWater, props: tempProps, presenceLights: tempPresence };
   }, [cityName]);
 
   // Animation loop for User Presence Lights
@@ -268,7 +270,7 @@ export const CityPointModel: React.FC<CityPointModelProps> = ({ cityName, isDay 
   });
 
   useEffect(() => {
-    if (!buildingRef.current || !terrainRef.current || !propsRef.current || !presenceRef.current) return;
+    if (!buildingRef.current || !terrainRef.current || !waterRef.current || !propsRef.current || !presenceRef.current) return;
 
     buildings.forEach((data, i) => {
       buildingRef.current!.setMatrixAt(i, data.matrix);
@@ -288,6 +290,15 @@ export const CityPointModel: React.FC<CityPointModelProps> = ({ cityName, isDay 
     terrainRef.current.instanceMatrix.needsUpdate = true;
     if (terrainRef.current.instanceColor) terrainRef.current.instanceColor.needsUpdate = true;
 
+    water.forEach((data, i) => {
+      waterRef.current!.setMatrixAt(i, data.matrix);
+      const c = data.color.clone();
+      if (!isDay) c.multiplyScalar(0.4); 
+      waterRef.current!.setColorAt(i, c);
+    });
+    waterRef.current.instanceMatrix.needsUpdate = true;
+    if (waterRef.current.instanceColor) waterRef.current.instanceColor.needsUpdate = true;
+
     props.forEach((data, i) => {
       propsRef.current!.setMatrixAt(i, data.matrix);
       let c = data.color.clone();
@@ -306,7 +317,7 @@ export const CityPointModel: React.FC<CityPointModelProps> = ({ cityName, isDay 
     });
     presenceRef.current.instanceMatrix.needsUpdate = true;
 
-  }, [buildings, terrain, props, presenceLights, isDay]);
+  }, [buildings, terrain, water, props, presenceLights, isDay]);
 
   return (
     <group>
@@ -317,14 +328,26 @@ export const CityPointModel: React.FC<CityPointModelProps> = ({ cityName, isDay 
             emissiveMap={emissiveTex}
             emissive={isDay ? new THREE.Color(0x000000) : new THREE.Color(0xffaa00)}
             emissiveIntensity={isDay ? 0 : 0.8}
-            roughness={0.3}
-            metalness={0.2}
+            roughness={0.2}
+            metalness={0.4}
         />
       </instancedMesh>
 
       <instancedMesh ref={terrainRef} args={[undefined, undefined, terrain.length]} receiveShadow>
          <boxGeometry args={[1, 1, 1]} />
          <meshStandardMaterial roughness={0.9} metalness={0.0} />
+      </instancedMesh>
+
+      <instancedMesh ref={waterRef} args={[undefined, undefined, water.length]} receiveShadow>
+         <boxGeometry args={[1, 1, 1]} />
+         <meshPhysicalMaterial 
+           roughness={0.1} 
+           metalness={0.1} 
+           transmission={0.8} 
+           ior={1.33} 
+           transparent 
+           opacity={0.9} 
+         />
       </instancedMesh>
 
       <instancedMesh ref={propsRef} args={[undefined, undefined, props.length]} castShadow>

@@ -35,28 +35,28 @@ export const Platform: React.FC<PlatformProps> = ({ condition, temperature, city
           <cylinderGeometry args={[9.5, 10.5, 2.5, 64]} />
           <meshStandardMaterial 
             color={COLORS.platform.side} 
-            roughness={0.3} 
+            roughness={0.6} 
             metalness={0.1} 
           />
         </mesh>
         
         {/* Gold Trim Ring Bottom */}
-        <mesh position={[0, 0, 0]}>
+        <mesh position={[0, 0, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[10.6, 10.6, 0.2, 64]} />
           <meshStandardMaterial 
             color={COLORS.platform.accent} 
-            metalness={0.8} 
-            roughness={0.2} 
+            metalness={1.0} 
+            roughness={0.15} 
           />
         </mesh>
 
         {/* Gold Trim Ring Top */}
-        <mesh position={[0, 2.2, 0]}>
+        <mesh position={[0, 2.2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[9.6, 9.6, 0.1, 64]} />
           <meshStandardMaterial 
             color={COLORS.platform.accent} 
-            metalness={0.8} 
-            roughness={0.2} 
+            metalness={1.0} 
+            roughness={0.15} 
           />
         </mesh>
 
@@ -65,8 +65,8 @@ export const Platform: React.FC<PlatformProps> = ({ condition, temperature, city
            <cylinderGeometry args={[9.2, 9.2, 0.2, 64]} />
            <meshStandardMaterial 
              color="#ffffff" 
-             roughness={1} 
-             metalness={0}
+             roughness={0.8} 
+             metalness={0.1}
            />
         </mesh>
       </group>
@@ -82,14 +82,14 @@ export const Platform: React.FC<PlatformProps> = ({ condition, temperature, city
         {/* Radius 10 to encapsulate city (radius ~9) */}
         <sphereGeometry args={[10, 64, 64]} />
         <meshPhysicalMaterial 
-          thickness={0.05} 
-          roughness={0}
+          thickness={0.5} 
+          roughness={0.05}
           clearcoat={1}
-          clearcoatRoughness={0}
-          transmission={0.99} // High transmission
+          clearcoatRoughness={0.05}
+          transmission={1} // High transmission
           transparent={true}
-          opacity={0.15} // Low opacity base
-          ior={1.4} // Slightly lower IOR for less distortion
+          opacity={1} // High opacity base for physical material
+          ior={1.45} // Slightly lower IOR for less distortion
           color="#ffffff"
           side={2} // DoubleSide
         />

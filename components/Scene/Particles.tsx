@@ -7,10 +7,11 @@ import { COLORS } from '../../constants';
 interface ParticlesProps {
   condition: WeatherCondition;
   count?: number;
-  shakeIntensity?: number; // New prop for somaesthetic shake input
+  shakeIntensity?: number;
+  windIntensity?: number; // 0 to 1 (from API or Mic)
 }
 
-export const Particles: React.FC<ParticlesProps> = ({ condition, count = 800, shakeIntensity = 0 }) => {
+export const Particles: React.FC<ParticlesProps> = ({ condition, count = 1200, shakeIntensity = 0, windIntensity = 0 }) => {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
@@ -48,6 +49,10 @@ export const Particles: React.FC<ParticlesProps> = ({ condition, count = 800, sh
     
     const t = state.clock.getElapsedTime();
 
+    // Wind direction vector (mostly lateral)
+    const windX = Math.sin(t * 0.5) * windIntensity * 0.2;
+    const windZ = Math.cos(t * 0.3) * windIntensity * 0.2;
+
     particles.forEach((particle, i) => {
       // --- Shake Physics ---
       // If shaking, add chaotic velocity
@@ -55,6 +60,13 @@ export const Particles: React.FC<ParticlesProps> = ({ condition, count = 800, sh
         particle.velocity.x += (Math.random() - 0.5) * shakeIntensity * 0.5;
         particle.velocity.y += (Math.random() - 0.5) * shakeIntensity * 0.5;
         particle.velocity.z += (Math.random() - 0.5) * shakeIntensity * 0.5;
+      }
+
+      // --- Wind/Breath Physics ---
+      // Wind pushes particles horizontally
+      if (windIntensity > 0.1) {
+         particle.velocity.x += windX * 0.5;
+         particle.velocity.z += windZ * 0.5;
       }
 
       // Apply drag to velocity (return to normal)
@@ -84,8 +96,16 @@ export const Particles: React.FC<ParticlesProps> = ({ condition, count = 800, sh
         // Respawn at top
         const r = (0.5 + Math.random() * 0.5) * GLOBE_RADIUS * 0.8; 
         particle.y = Math.abs(r); 
-        particle.x = (Math.random() - 0.5) * GLOBE_RADIUS;
-        particle.z = (Math.random() - 0.5) * GLOBE_RADIUS;
+        
+        // If high wind, spawn them upwind so they blow into frame
+        if (windIntensity > 2) {
+            particle.x = -windX * 50 + (Math.random() - 0.5) * 5;
+            particle.z = -windZ * 50 + (Math.random() - 0.5) * 5;
+        } else {
+            particle.x = (Math.random() - 0.5) * GLOBE_RADIUS;
+            particle.z = (Math.random() - 0.5) * GLOBE_RADIUS;
+        }
+
         // Reset velocity on respawn
         particle.velocity.set(0, 0, 0);
       }
@@ -94,11 +114,13 @@ export const Particles: React.FC<ParticlesProps> = ({ condition, count = 800, sh
       dummy.position.set(particle.x, particle.y + GLOBE_CENTER_Y + 4, particle.z); 
 
       if (condition === WeatherCondition.Rain || condition === WeatherCondition.Thunderstorm) {
-        dummy.scale.set(0.04, 0.4, 0.04);
-        // Tilt rain based on movement
-        dummy.rotation.set(particle.velocity.z * 2, 0, 0.1 + particle.velocity.x * 2);
+        dummy.scale.set(0.02, 0.4, 0.02);
+        // Tilt rain based on movement + wind
+        const tiltX = particle.velocity.x * 2 + (windX * 5);
+        const tiltZ = particle.velocity.z * 2 + (windZ * 5);
+        dummy.rotation.set(tiltZ, 0, -tiltX);
       } else {
-        dummy.scale.set(0.1, 0.1, 0.1);
+        dummy.scale.set(0.08, 0.08, 0.08);
         dummy.rotation.set(t + i + (shakeIntensity * 5), t + i, 0); 
       }
 
@@ -113,21 +135,33 @@ export const Particles: React.FC<ParticlesProps> = ({ condition, count = 800, sh
     return null; 
   }
 
-  const particleColor = (condition === WeatherCondition.Snow || condition === WeatherCondition.Clear) ? COLORS.snow : COLORS.rain;
+  const isRain = condition === WeatherCondition.Rain || condition === WeatherCondition.Thunderstorm;
+  const particleColor = isRain ? COLORS.rain : COLORS.snow;
 
   return (
     <instancedMesh ref={mesh} args={[undefined, undefined, count]} position={[0, -4, 0]}>
-      {condition === WeatherCondition.Rain || condition === WeatherCondition.Thunderstorm ? (
-         <boxGeometry args={[1, 1, 1]} />
+      {isRain ? (
+         <cylinderGeometry args={[1, 1, 1, 8]} />
       ) : (
-         <dodecahedronGeometry args={[1, 0]} />
+         <sphereGeometry args={[1, 16, 16]} />
       )}
-      <meshStandardMaterial 
-        color={particleColor} 
-        emissive={particleColor}
-        emissiveIntensity={0.8}
-        roughness={0.1}
-      />
+      {isRain ? (
+        <meshPhysicalMaterial 
+          color={particleColor} 
+          transmission={0.9}
+          opacity={1}
+          transparent
+          roughness={0}
+          ior={1.33}
+        />
+      ) : (
+        <meshStandardMaterial 
+          color={particleColor} 
+          emissive={particleColor}
+          emissiveIntensity={0.5}
+          roughness={0.8}
+        />
+      )}
     </instancedMesh>
   );
 };

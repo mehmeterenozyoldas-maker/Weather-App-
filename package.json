@@ -9,11 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^19.2.3",
-    "@react-three/fiber": "^9.4.2",
     "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.2",
+    "@react-three/postprocessing": "^3.0.4",
     "lucide-react": "^0.562.0",
+    "peerjs": "1.5.2",
+    "qrcode": "1.5.3",
     "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "three": "^0.182.0"
   },
   "devDependencies": {
